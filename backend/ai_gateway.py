@@ -1,7 +1,14 @@
+import os
+import sys
+
+# 清除可能影响网络请求的代理环境变量
+for var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'GITHUB_TOKEN', 'GITHUB_ACTOR']:
+    os.environ.pop(var, None)
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
 import re
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -35,20 +42,6 @@ config = {
         "extra_body": {},
         "messages": []
     },
-    "gemini": {
-        "api_key": os.environ.get("GEMINI_API_KEY", "your-own-api-key"),
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/models",
-        "model": "gemini-2.0-flash",
-        "extra_body": {},
-        "messages": []
-    },
-    "openai": {
-        "api_key": os.environ.get("OPENAI_API_KEY", "your-own-api-key"),
-        "base_url": "https://api.openai.com/v1",
-        "model": "gpt-3.5-turbo",
-        "extra_body": {},
-        "messages": []
-    }
 }
 
 param = {
@@ -61,47 +54,57 @@ system_prompt = "请用简洁、专业的语言回答用户的问题，基于提
 
 
 def call_openai_compatible(model_id, messages, stream=False):
-    import openai
-    client = openai.OpenAI(
-        api_key=config[model_id]["api_key"],
-        base_url=config[model_id]["base_url"]
-    )
-    
-    message = client.chat.completions.create(
-        model=config[model_id]["model"],
-        messages=messages,
-        extra_body=config[model_id]["extra_body"],
-        temperature=param["temperature"],
-        max_tokens=param["max_new_tokens"],
-        stream=stream
-    )
-    
-    if stream:
-        response = ""
-        for chunk in message:
-            if chunk.choices[0].delta.content is not None:
-                response += chunk.choices[0].delta.content
-        return response
-    else:
-        return message.choices[0].message.content
+    cfg = config[model_id]
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {cfg["api_key"]}'
+    }
 
+    payload = {
+        "model": cfg["model"],
+        "messages": messages,
+        "temperature": param["temperature"],
+        "max_tokens": param["max_new_tokens"],
+        "stream": stream,
+        **cfg["extra_body"]
+    }
 
-def call_gemini(model_id, messages, stream=False):
-    import google.generativeai as genai
-    
-    genai.configure(api_key=config[model_id]["api_key"])
-    model = genai.GenerativeModel(config[model_id]["model"])
-    
-    text = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
-    response = model.generate_content(text, stream=stream)
-    
-    if stream:
-        result = ""
-        for chunk in response:
-            result += chunk.text
-        return result
-    else:
-        return response.text
+    try:
+        response = requests.post(
+            f"{cfg['base_url']}/chat/completions",
+            headers=headers,
+            json=payload,
+            stream=stream,
+            timeout=60
+        )
+        response.raise_for_status()
+
+        if stream:
+            result = ""
+            for line in response.iter_lines():
+                if line:
+                    line_str = line.decode('utf-8')
+                    if line_str.startswith('data: '):
+                        json_str = line_str[6:]
+                        if json_str == '[DONE]':
+                            break
+                        try:
+                            import json
+                            chunk = json.loads(json_str)
+                            if chunk.get('choices'):
+                                delta = chunk['choices'][0].get('delta', {})
+                                if delta.get('content'):
+                                    result += delta['content']
+                        except:
+                            continue
+            return result
+        else:
+            data = response.json()
+            if data.get('choices'):
+                return data['choices'][0]['message']['content']
+            return str(data)
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"HTTP 请求失败: {str(e)}")
 
 
 def clean_response(response):
@@ -113,41 +116,38 @@ def clean_response(response):
 def chat():
     try:
         data = request.json
-        model_id = data.get('model_id', 'gemini')
+        model_id = data.get('model_id', 'tongyi')
         question = data.get('question', '')
         context = data.get('context', '')
         stream = data.get('stream', False)
-        
+
         if not question:
             return jsonify({"error": "Please enter a question"}), 400
-        
+
         if model_id not in config:
             return jsonify({"error": f"Unknown model: {model_id}"}), 400
-        
+
         messages = [{"role": "system", "content": system_prompt}]
-        
+
         if context:
             messages.append({"role": "user", "content": f"文档上下文：\n{context}\n\n基于以上上下文回答问题："})
-        
+
         messages.append({"role": "user", "content": question})
-        
-        if model_id == "gemini":
-            response = call_gemini(model_id, messages, stream)
-        else:
-            response = call_openai_compatible(model_id, messages, stream)
-        
+
+        response = call_openai_compatible(model_id, messages, stream)
+
         response = clean_response(response)
-        
+
         config[model_id]["messages"].append({"role": "user", "content": question})
         config[model_id]["messages"].append({"role": "assistant", "content": response})
-        
+
         return jsonify({
             "model_id": model_id,
             "question": question,
             "answer": response,
             "context_provided": bool(context)
         })
-    
+
     except Exception as e:
         return jsonify({"error": f"Failed to call model: {str(e)}"}), 500
 
@@ -156,7 +156,7 @@ def chat():
 def get_models():
     return jsonify({
         "models": list(config.keys()),
-        "default": "gemini",
+        "default": "tongyi",
         "supported_features": ["context", "stream"]
     })
 
@@ -165,7 +165,7 @@ def get_models():
 def get_history(model_id):
     if model_id not in config:
         return jsonify({"error": f"Unknown model: {model_id}"}), 400
-    
+
     return jsonify({
         "model_id": model_id,
         "history": config[model_id]["messages"]
@@ -176,7 +176,7 @@ def get_history(model_id):
 def clear_history(model_id):
     if model_id not in config:
         return jsonify({"error": f"Unknown model: {model_id}"}), 400
-    
+
     config[model_id]["messages"] = []
     return jsonify({"status": "success", "message": "History cleared"})
 

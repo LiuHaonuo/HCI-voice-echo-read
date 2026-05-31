@@ -254,21 +254,13 @@ cp .env.example .env
 python ai_gateway.py
 ```
 
-### 4.2 配置前端
-
-在 `.env` 文件中配置网关地址：
-
-```bash
-VITE_AI_GATEWAY_URL=http://localhost:5000/api/v1
-```
-
-### 4.3 启动前端应用
+### 4.2 启动前端应用
 
 ```bash
 npm run dev
 ```
 
-### 4.4 功能测试
+### 4.3 功能测试
 
 1. 确保 Python 网关已启动
 2. 点击"导入测试课件"加载测试文档

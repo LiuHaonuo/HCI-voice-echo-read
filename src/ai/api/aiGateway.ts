@@ -75,7 +75,7 @@ export const aiGateway = {
   async askWithContext(
     question: string,
     context: string,
-    modelId: string = 'gemini'
+    modelId: string = 'tongyi'
   ): Promise<AiResponse> {
     return this.chat({
       model_id: modelId,
