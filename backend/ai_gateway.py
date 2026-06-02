@@ -15,9 +15,9 @@ CORS(app)
 
 config = {
     "deepseek": {
-        "api_key": os.environ.get("DEEPSEEK_API_KEY", "ms-1f381b5f-97ad-40c6-93cf-c9b8e66a2136"),
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "model": "deepseek-ai/DeepSeek-V4-Flash",
+        "api_key": os.environ.get("DEEPSEEK_API_KEY", "your-own-api-key"),
+        "base_url": "https://api.deepseek.com/v1",
+        "model": "deepseek-chat",
         "extra_body": {},
         "messages": []
     },
@@ -185,6 +185,80 @@ def clear_history(model_id):
 def health_check():
     return jsonify({"status": "healthy", "service": "ai-gateway"})
 
+# ========================================================
+# 🤝 完美兼容扩展：为前端解决前端 pdfjs 崩溃增加的后端解析接口
+# ========================================================
+from pypdf import PdfReader
+import io
+import time
+
+@app.route('/api/v1/parse/pdf', methods=['POST'])
+def parse_pdf_backend():
+    if 'file' not in request.files:
+        return jsonify({"error": "未检测到上传的文件流(file)"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "未选择任何有效文件"}), 400
+
+    try:
+        # 1. 将前端传来的文件流载入内存
+        file_bytes = file.read()
+        reader = PdfReader(io.BytesIO(file_bytes))
+        
+        full_text_chunks = []
+        
+        # 2. 逐页提取纯文本
+        for page in reader.pages:
+            page_text = page.extract_text() or ""
+            if page_text.strip():
+                full_text_chunks.append(page_text)
+                
+        # 3. 将所有页面的内容合并，并拆分成原始物理行
+        raw_lines = "\n".join(full_text_chunks).splitlines()
+        
+        # 4. 🧠 智混重组引擎：防止物理换行符把卡片切得支离破碎
+        merged_paragraphs = []
+        current_buffer = ""
+        
+        for line in raw_lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            if not current_buffer:
+                current_buffer = line
+            else:
+                # 判断当前缓冲池的最后一个字符是不是句末标点
+                is_end_with_punct = any(current_buffer.endswith(p) for p in ['。', '？', '！', '.', '?', '!', ':', '：'])
+                # 如果没到标点，且上一行长度不够（说明是自然换行被意外截断了），则视为同一段话
+                if not is_end_with_punct and len(current_buffer) < 40:
+                    current_buffer += line
+                else:
+                    merged_paragraphs.append(current_buffer)
+                    current_buffer = line
+                    
+        if current_buffer:
+            merged_paragraphs.append(current_buffer)
+            
+        # 5. 组装成前端状态机（readerStore 和卡片渲染）要求的标准数据结构
+        paragraphs_data = []
+        for index, text in enumerate(merged_paragraphs):
+            paragraphs_data.append({
+                "id": f"pdf-py-p-{index}-{int(time.time() * 1000)}",
+                "index": index,
+                "text": text,
+                "charCount": len(text)
+            })
+            
+        return jsonify({
+            "fileName": file.filename,
+            "paragraphs": paragraphs_data
+        })
+
+    except Exception as e:
+        print(f"Python PDF 解析核心崩溃: {str(e)}")
+        return jsonify({"error": f"后端 PDF 引擎提取失败: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)

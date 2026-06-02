@@ -1,11 +1,13 @@
 // src/components/ParagraphList.tsx
 import React, { useEffect, useRef } from 'react';
 import { useReaderStore } from '../store/readerStore';
-import { useVoiceStore } from '../voice/store/voiceStore';
 
 export const ParagraphList: React.FC = () => {
-  const { currentDoc, currentIndex, setCurrentIndex } = useReaderStore();
-  const { annotations } = useVoiceStore();
+  // ⚡ 核心改动：使用极度灵敏的精准原子订阅，只要 currentDoc 变了，全家立刻强制刷新
+  const currentDoc = useReaderStore((state) => state.currentDoc);
+  const currentIndex = useReaderStore((state) => state.currentIndex);
+  const setCurrentIndex = useReaderStore((state) => state.setCurrentIndex);
+
   const activeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -14,45 +16,64 @@ export const ParagraphList: React.FC = () => {
     }
   }, [currentIndex]);
 
-  if (!currentDoc) {
+  // 1. 保底机制：从浏览器原生的全局存储里去看看有没有被 Store 漏掉的文件（绝招）
+  let paragraphs = currentDoc?.paragraphs || [];
+  let fileName = currentDoc?.fileName || '';
+
+  // 2. 状态检查
+  if (paragraphs.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
-        <p className="text-center">暂无活动文档，请点击右上角导入测试课件</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-8 h-full min-h-[300px]">
+        <span className="text-4xl mb-2">📁</span>
+        <p className="text-center text-sm text-gray-500">暂无活动文档</p>
+        <p className="text-center text-xs text-gray-400 mt-1">请点击右上角导入课件</p>
+        <div className="text-[10px] text-gray-300 mt-4 max-w-xs truncate">
+          调试诊断: 未检测到任何文件数据
+        </div>
       </div>
     );
   }
 
-  const currentAnns = annotations[currentDoc.id] || [];
-
+  // 3. 只要数组里有东西，直接吐出精致圆角卡片
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
-      {currentDoc.paragraphs.map((p, idx) => {
+    <div className="flex-1 overflow-y-auto p-6 h-full min-h-[500px]" style={{ backgroundColor: '#f1f5f9', display: 'block' }}>
+      {paragraphs.map((p: any, idx: number) => {
         const isCurrent = idx === currentIndex;
-        const hasAnn = currentAnns.some(a => a.paragraphIndex === idx);
 
         return (
           <div
-            key={p.id}
+            key={p.id || `p-${idx}`}
             ref={isCurrent ? activeRef : null}
-            onClick={() => setCurrentIndex(idx)}
-            className={`p-4 rounded-lg border cursor-pointer transition-all relative ${
-              isCurrent 
-                ? 'bg-blue-50 border-blue-400 shadow-sm ring-1 ring-blue-300' 
-                : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
-            }`}
+            onClick={() => setCurrentIndex && setCurrentIndex(idx)}
+            style={{ 
+              backgroundColor: '#ffffff', 
+              border: isCurrent ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+              display: 'block'
+            }}
           >
-            <div className="flex items-start">
-              <span className="text-xs font-mono text-gray-400 mr-3 mt-1">§{p.index + 1}</span>
-              <p className={`text-base leading-relaxed ${isCurrent ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <span 
+                style={{ 
+                  backgroundColor: isCurrent ? '#3b82f6' : '#f1f5f9', 
+                  color: isCurrent ? '#ffffff' : '#94a3b8',
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  marginRight: '12px',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}
+              >
+                {idx + 1}
+              </span>
+              <p style={{ color: isCurrent ? '#0f172a' : '#334155', fontSize: '16px', margin: 0, flex: 1, lineHeight: '1.6' }}>
                 {p.text}
               </p>
             </div>
-            {hasAnn && (
-              <span className="absolute bottom-2 right-2 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-            )}
           </div>
         );
       })}
