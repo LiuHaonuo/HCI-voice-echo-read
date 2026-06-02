@@ -15,9 +15,9 @@ CORS(app)
 
 config = {
     "deepseek": {
-        "api_key": os.environ.get("DEEPSEEK_API_KEY", "your-own-api-key"),
-        "base_url": "https://api.deepseek.com/v1",
-        "model": "deepseek-chat",
+        "api_key": os.environ.get("DEEPSEEK_API_KEY", "ms-1f381b5f-97ad-40c6-93cf-c9b8e66a2136"),
+        "base_url": "https://api-inference.modelscope.cn/v1",
+        "model": "deepseek-ai/DeepSeek-V4-Flash",
         "extra_body": {},
         "messages": []
     },

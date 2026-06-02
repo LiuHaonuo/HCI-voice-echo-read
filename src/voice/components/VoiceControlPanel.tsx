@@ -1,35 +1,54 @@
 // src/voice/components/VoiceControlPanel.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useVoiceStore } from '../store/voiceStore';
 import { useReaderStore } from '../../store/readerStore';
 import { eventBus } from '../../integration/EventBus';
 import { audioManager } from '../../integration/AudioManager';
 
-export const VoiceControlPanel: React.FC = () => {
-  const { status, setStatus, isPlaying, setIsPlaying } = useVoiceStore();
-  const { currentIndex, currentDoc, setCurrentIndex, speechRate } = useReaderStore();
+interface PlayRequestPayload {
+  currentIndex: number;
+  speechRate: number;
+}
 
-  // 监听来自 A 的控制指令
+interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionError {
+  error: string;
+}
+
+export const VoiceControlPanel: React.FC = () => {
+  const { status, setStatus } = useVoiceStore();
+  const { currentIndex, currentDoc, setCurrentIndex, speechRate } = useReaderStore();
+  const [recognizedText, setRecognizedText] = useState<string>('');
+
   useEffect(() => {
-    const startTts = (payload: any) => {
+    const startTts = (payload: PlayRequestPayload) => {
       audioManager.acquire('tts');
-      setIsPlaying(true);
       setStatus('speaking');
       console.log(`[TTS Engine] 正在以 ${payload.speechRate} 速度朗读第 ${payload.currentIndex + 1} 段`);
       
-      // 原生 Web Speech API Mock
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const text = currentDoc?.paragraphs[payload.currentIndex]?.text || '';
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = payload.speechRate;
         utterance.onend = () => {
-          setIsPlaying(false);
           setStatus('idle');
           audioManager.release('tts');
-          // 段末自动跳下一段
-          if (currentDoc && currentIndex < currentDoc.paragraphs.length - 1) {
-            setCurrentIndex(currentIndex + 1);
+          if (currentDoc && payload.currentIndex < currentDoc.paragraphs.length - 1) {
+            setCurrentIndex(payload.currentIndex + 1);
           }
         };
         window.speechSynthesis.speak(utterance);
@@ -37,7 +56,6 @@ export const VoiceControlPanel: React.FC = () => {
     };
 
     const stopTts = () => {
-      setIsPlaying(false);
       setStatus('idle');
       window.speechSynthesis?.pause();
       audioManager.release('tts');
@@ -50,24 +68,65 @@ export const VoiceControlPanel: React.FC = () => {
       eventBus.off('reader:play-request', startTts);
       eventBus.off('reader:pause-request', stopTts);
     };
-  }, [currentDoc, currentIndex, speechRate]);
+  }, [currentDoc]);
 
-  const handleSimulateVoiceCommand = (command: string) => {
+  const handleVoiceCommand = useCallback((transcript: string, idx: number, rate: number) => {
+    console.log(`[STT] 识别结果: ${transcript}`);
+    
+    if (transcript.includes('播放')) {
+      eventBus.emit('reader:play-request', { currentIndex: idx, speechRate: rate });
+    }
+    if (transcript.includes('下一段')) {
+      setCurrentIndex(idx + 1);
+    }
+    if (transcript.includes('上一段')) {
+      setCurrentIndex(idx - 1);
+    }
+    if (transcript.includes('暂停')) {
+      eventBus.emit('reader:pause-request');
+    }
+  }, [setCurrentIndex]);
+
+  const startListening = () => {
+    const win = window as unknown as { 
+      webkitSpeechRecognition?: typeof window.SpeechRecognition;
+      SpeechRecognition?: typeof window.SpeechRecognition;
+    };
+    const SpeechRecognition = win.webkitSpeechRecognition || win.SpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('您的浏览器不支持语音识别功能，请使用 Chrome 或 Edge 浏览器');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
     audioManager.acquire('stt');
     setStatus('listening');
-    
-    setTimeout(() => {
-      setStatus('recognizing');
-      setTimeout(() => {
-        console.log(`[STT] 匹配到语音指令: ${command}`);
-        setStatus('idle');
-        audioManager.release('stt');
+    setRecognizedText('');
 
-        if (command === '下一段') setCurrentIndex(currentIndex + 1);
-        if (command === '上一段') setCurrentIndex(currentIndex - 1);
-        if (command === '暂停') eventBus.emit('reader:pause-request');
-      }, 800);
-    }, 1000);
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript;
+      setRecognizedText(transcript);
+      handleVoiceCommand(transcript, currentIndex, speechRate);
+    };
+
+    recognition.onend = () => {
+      setStatus('idle');
+      audioManager.release('stt');
+    };
+
+    recognition.onerror = (event: SpeechRecognitionError) => {
+      console.error('[STT] 语音识别错误:', event.error);
+      setStatus('idle');
+      audioManager.release('stt');
+    };
+
+    recognition.start();
   };
 
   return (
@@ -79,10 +138,29 @@ export const VoiceControlPanel: React.FC = () => {
         </span>
       </h3>
       
-      <div className="grid grid-cols-3 gap-2 mt-3">
-        <button onClick={() => handleSimulateVoiceCommand('上一段')} className="bg-white hover:bg-gray-100 border p-2 rounded text-xs">🗣️ "上一段"</button>
-        <button onClick={() => handleSimulateVoiceCommand('暂停')} className="bg-white hover:bg-gray-100 border p-2 rounded text-xs">🗣️ "暂停"</button>
-        <button onClick={() => handleSimulateVoiceCommand('下一段')} className="bg-white hover:bg-gray-100 border p-2 rounded text-xs">🗣️ "下一段"</button>
+      <div className="mt-3">
+        <button 
+          onClick={startListening}
+          disabled={status === 'listening'}
+          className={`w-full py-3 rounded-lg text-sm font-medium transition-all ${
+            status === 'listening' 
+              ? 'bg-red-500 text-white animate-pulse' 
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }`}
+        >
+          {status === 'listening' ? '🔴 正在听...' : '🎤 点击开始语音输入'}
+        </button>
+        
+        {recognizedText && (
+          <div className="mt-3 p-3 bg-white border rounded-lg">
+            <div className="text-xs text-gray-500 mb-1">识别结果:</div>
+            <div className="text-sm text-gray-800">{recognizedText}</div>
+          </div>
+        )}
+        
+        <div className="mt-3 text-xs text-gray-400 text-center">
+          尝试说: "播放"、"暂停"、"上一段"、"下一段"
+        </div>
       </div>
     </div>
   );
