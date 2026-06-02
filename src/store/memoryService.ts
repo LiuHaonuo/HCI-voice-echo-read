@@ -1,0 +1,28 @@
+// src/store/memoryService.ts
+import { ReadingMemory } from '../types/document';
+
+const STORAGE_PREFIX = 'voiceecho:memory:';
+
+export const memoryService = {
+  // 保存断点到浏览器的 LocalStorage
+  save: (docId: string, index: number) => {
+    const memory: ReadingMemory = {
+      docId,
+      currentIndex: index,
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem(`${STORAGE_PREFIX}${docId}`, JSON.stringify(memory));
+  },
+
+  // 读取历史断点
+  load: (docId: string): number => {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${docId}`);
+    if (!raw) return 0;
+    try {
+      const memory: ReadingMemory = JSON.parse(raw);
+      return memory.currentIndex;
+    } catch {
+      return 0;
+    }
+  },
+};

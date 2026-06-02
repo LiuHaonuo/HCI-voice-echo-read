@@ -7,7 +7,7 @@
     "skipLibCheck": true,
 
     /* 核心修复：允许打包和识别所有目录下的 TSX */
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,

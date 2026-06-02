@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background-color: #f1f5f9; /* 铺一个淡淡的灰色底色，好让白色的段落卡片显现出来 */
+}
