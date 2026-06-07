@@ -3,7 +3,6 @@ import React, { useEffect, useRef } from 'react';
 import { useReaderStore } from '../store/readerStore';
 
 export const ParagraphList: React.FC = () => {
-  // ⚡ 核心改动：使用极度灵敏的精准原子订阅，只要 currentDoc 变了，全家立刻强制刷新
   const currentDoc = useReaderStore((state) => state.currentDoc);
   const currentIndex = useReaderStore((state) => state.currentIndex);
   const setCurrentIndex = useReaderStore((state) => state.setCurrentIndex);
@@ -16,27 +15,28 @@ export const ParagraphList: React.FC = () => {
     }
   }, [currentIndex]);
 
-  // 1. 保底机制：从浏览器原生的全局存储里去看看有没有被 Store 漏掉的文件（绝招）
   let paragraphs = currentDoc?.paragraphs || [];
-  let fileName = currentDoc?.fileName || '';
 
-  // 2. 状态检查
   if (paragraphs.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 h-full min-h-[300px]">
-        <span className="text-4xl mb-2">📁</span>
-        <p className="text-center text-sm text-gray-500">暂无活动文档</p>
-        <p className="text-center text-xs text-gray-400 mt-1">请点击右上角导入课件</p>
-        <div className="text-[10px] text-gray-300 mt-4 max-w-xs truncate">
-          调试诊断: 未检测到任何文件数据
-        </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px', height: '100%' }}>
+        <span style={{ fontSize: '36px', marginBottom: '8px' }}>📁</span>
+        <p style={{ textAlign: 'center', fontSize: '14px', color: '#64748b', margin: 0 }}>暂无活动文档</p>
+        <p style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', marginTop: '4px', margin: 0 }}>请点击右上角导入课件</p>
       </div>
     );
   }
 
-  // 3. 只要数组里有东西，直接吐出精致圆角卡片
   return (
-    <div className="flex-1 overflow-y-auto p-6 h-full min-h-[500px]" style={{ backgroundColor: '#f1f5f9', display: 'block' }}>
+    // ⚡ 降维打击核心：用原生行内样式限死高度，在内部强制撑开纵向滚动条
+    <div style={{
+      flex: 1,
+      overflowY: 'auto',
+      padding: '24px',
+      backgroundColor: '#f1f5f9',
+      display: 'block',
+      height: 'calc(100% - 10px)' // 保留微弱间距，防止触底
+    }}>
       {paragraphs.map((p: any, idx: number) => {
         const isCurrent = idx === currentIndex;
 
