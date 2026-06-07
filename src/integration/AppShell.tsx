@@ -10,27 +10,67 @@ import { HealthReminderModal } from '../health/HealthReminderModal';
 
 export const AppShell: React.FC = () => {
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-100 font-sans antialiased">
-      {/* 顶部上传栏 */}
-      <DocumentUploader />
+    // 🔒 用纯原生样式强行框死整个视口，让全网页的大滚动条绝对无法出现
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: '100vw',
+      height: '100vh',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: '#f1f5f9',
+      fontFamily: 'sans-serif'
+    }}>
+      {/* 顶部上传栏：固定高度，不参与压缩 */}
+      <div style={{ height: '60px', backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+        <DocumentUploader />
+      </div>
 
-      {/* 主体交互区分栏 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左侧：阅读主干道 (70%) */}
-        <div className="w-[70%] flex flex-col bg-white border-r border-gray-200">
+      {/* 主体交互区分栏：铺满除去顶部栏之外的所有视口高度 */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        
+        {/* 💡 左侧阅读主干道 (占 70% 宽度) */}
+        <div style={{
+          width: '70%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#ffffff',
+          borderRight: '1px solid #e2e8f0',
+          overflow: 'hidden',
+          position: 'relative'
+        }}>
+          {/* 1. 文本框：自适应吃满中间的所有高度 */}
           <ParagraphList />
-          <ReaderControls />
+          
+          {/* 2. 控制按键栏：flex-shrink: 0 确保它被焊死在最底部，绝对不被挤出屏幕 */}
+          <div style={{ flexShrink: 0, borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+            <ReaderControls />
+          </div>
         </div>
 
-        {/* 右侧：语音与智能辅助控制台 (30%) */}
-        <aside className="w-[30%] bg-gray-100 p-4 flex flex-col overflow-y-auto space-y-4">
+        {/* 💡 右侧控制台 (占 30% 宽度) */}
+        <aside style={{
+          width: '30%',
+          height: '100%',
+          backgroundColor: '#f8fafc',
+          padding: '16px',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
           <VoiceControlPanel />
           <AnnotationRecorder />
           <AiQaPanel />
         </aside>
       </div>
 
-      {/* 全局健康提示模态层 */}
       <HealthReminderModal />
     </div>
   );
