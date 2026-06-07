@@ -5,10 +5,9 @@ export const HealthReminderModal: React.FC = () => {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // 演示阶段设为 45 秒触发一次
     const timer = setInterval(() => {
       if (!document.hidden) setShow(true);
-    }, 45000);
+    }, 1000*60*40);// 40 分钟触发一次提醒
 
     return () => clearInterval(timer);
   }, []);

@@ -15,3 +15,9 @@ export interface ReaderDocument {
   paragraphs: Paragraph[];
   uploadedAt: number;
 }
+
+export interface ReadingMemory {
+  docId: string;
+  currentIndex: number;
+  updatedAt: number;
+}

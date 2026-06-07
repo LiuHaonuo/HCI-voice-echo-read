@@ -2,7 +2,6 @@
 import { create } from 'zustand';
 import { ReaderDocument } from '../types/document';
 import { eventBus } from '../integration/EventBus';
-// 💡 安全修改：如果命名导出失败，我们直接引入整个解析模块，防止运行时 undefined
 import * as DocumentParserModule from '../parsers/documentParser';
 import { memoryService } from './memoryService';
 
@@ -11,11 +10,15 @@ interface ReaderState {
   currentIndex: number;
   speechRate: number;
   parseStatus: 'idle' | 'parsing' | 'ready' | 'error';
+  cachedDocs: ReaderDocument[];
   uploadAndParseFile: (file: File) => Promise<void>;
   setCurrentDoc: (doc: ReaderDocument) => void;
   setCurrentIndex: (index: number) => void;
   setSpeechRate: (rate: number) => void;
   setParseStatus: (status: 'idle' | 'parsing' | 'ready' | 'error') => void;
+  loadCachedDocument: (docId: string) => void;
+  removeCachedDocument: (docId: string) => void;
+  loadCachedDocs: () => void;
 }
 
 export const useReaderStore = create<ReaderState>((set, get) => ({
@@ -23,33 +26,38 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   currentIndex: 0,
   speechRate: 1.0,
   parseStatus: 'idle',
+  cachedDocs: [],
 
   uploadAndParseFile: async (file: File) => {
     set({ parseStatus: 'parsing' });
     try {
-      // ⚡ 安全兼容防御：自动适配是 默认导出(default) 还是 命名导出(parseDocument)
       let parseFn = (DocumentParserModule as any).parseDocument || (DocumentParserModule as any).default;
       
       if (!parseFn || typeof parseFn !== 'function') {
-        throw new Error('未在 documentParser 中找到有效的解析函数，请检查该文件的 export 方式');
+        throw new Error('未在 documentParser 中找到有效的解析函数');
       }
 
-      // 1. 调用安全提取出来的文件解析引擎
       const documentData = await parseFn(file);
-      
-      // 2. 安全读取历史进度
       const historyIndex = (memoryService && typeof memoryService.load === 'function') 
         ? (memoryService.load(documentData.id) || 0) 
         : 0;
 
-      // 3. 灌入全局状态
+      // 保存到本地缓存
+      if (memoryService && typeof memoryService.saveDocument === 'function') {
+        memoryService.saveDocument(documentData);
+      }
+
+      // 更新缓存列表
+      set((state) => ({
+        cachedDocs: [documentData, ...state.cachedDocs.filter(d => d.id !== documentData.id)]
+      }));
+
       set({ 
         currentDoc: documentData, 
         currentIndex: historyIndex, 
         parseStatus: 'ready' 
       });
 
-      // 4. 通知下游（包含成员B的 AI 模块）
       eventBus.emit('reader:doc-changed', documentData);
     } catch (error) {
       console.error('文档解析失败:', error);
@@ -57,8 +65,11 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
     }
   },
 
-  // 🤝 完美保留成员B的所有接口逻辑，确保 AI 面板运行畅通
-  setCurrentDoc: (doc) => set({ currentDoc: doc, currentIndex: 0, parseStatus: 'ready' }),
+  setCurrentDoc: (doc) => {
+    const historyIndex = memoryService.load(doc.id) || 0;
+    set({ currentDoc: doc, currentIndex: historyIndex, parseStatus: 'ready' });
+    eventBus.emit('reader:doc-changed', doc);
+  },
   
   setCurrentIndex: (index) => set((state) => {
     if (!state.currentDoc || index < 0 || index >= state.currentDoc.paragraphs.length) return state;
@@ -77,4 +88,29 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   }),
   
   setParseStatus: (status) => set({ parseStatus: status }),
+
+  // 加载缓存的文档
+  loadCachedDocument: (docId: string) => {
+    const doc = memoryService.getDocument(docId);
+    if (doc) {
+      get().setCurrentDoc(doc);
+    }
+  },
+
+  // 删除缓存的文档
+  removeCachedDocument: (docId: string) => {
+    memoryService.deleteDocument(docId);
+    set((state) => ({
+      cachedDocs: state.cachedDocs.filter(d => d.id !== docId),
+      // 如果删除的是当前文档，清空当前文档
+      currentDoc: state.currentDoc?.id === docId ? null : state.currentDoc,
+      currentIndex: state.currentDoc?.id === docId ? 0 : state.currentIndex
+    }));
+  },
+
+  // 加载所有缓存文档列表
+  loadCachedDocs: () => {
+    const docs = memoryService.getAllDocuments();
+    set({ cachedDocs: docs });
+  },
 }));
