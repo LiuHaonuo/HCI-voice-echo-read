@@ -1,5 +1,9 @@
 import os
 import sys
+from dotenv import load_dotenv
+
+# 加载 .env 文件
+load_dotenv()
 
 # 清除可能影响网络请求的代理环境变量
 for var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'GITHUB_TOKEN', 'GITHUB_ACTOR']:
@@ -16,8 +20,8 @@ CORS(app)
 config = {
     "deepseek": {
         "api_key": os.environ.get("DEEPSEEK_API_KEY", "your-own-api-key"),
-        "base_url": "https://api.deepseek.com/v1",
-        "model": "deepseek-chat",
+        "base_url": "https://api-inference.modelscope.cn/v1",
+        "model": "deepseek-ai/DeepSeek-V4-Flash",
         "extra_body": {},
         "messages": []
     },

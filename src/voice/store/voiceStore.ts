@@ -1,10 +1,13 @@
 // src/voice/store/voiceStore.ts
 import { create } from 'zustand';
 import { VoiceStatus, ParagraphAnnotation } from '../../types/voice';
+import { memoryService } from '../../store/memoryService';
 
 interface VoiceState {
   status: VoiceStatus;
   isPlaying: boolean;
+  isAnnotating: boolean;
+  isAsking: boolean;
   annotations: { [docId: string]: ParagraphAnnotation[] };
   setStatus: (status: VoiceStatus) => void;
   setIsPlaying: (isPlaying: boolean) => void;
@@ -34,6 +37,8 @@ const loadFromStorage = (docId: string): ParagraphAnnotation[] => {
 export const useVoiceStore = create<VoiceState>((set, get) => ({
   status: 'idle',
   isPlaying: false,
+  isAnnotating: false,
+  isAsking: false,
   annotations: {},
   
   setStatus: (status) => set({ status }),
