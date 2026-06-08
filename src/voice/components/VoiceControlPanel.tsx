@@ -11,24 +11,6 @@ interface PlayRequestPayload {
   speechRate: number;
 }
 
-interface SpeechRecognitionResult {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognitionResultList {
-  [index: number]: SpeechRecognitionResult;
-  length: number;
-}
-
-interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionError {
-  error: string;
-}
-
 export const VoiceControlPanel: React.FC = () => {
   const { status, setStatus, isAnnotating, setIsAnnotating, isAsking, setIsAsking, addAnnotation } = useVoiceStore();
   const { currentIndex, currentDoc, setCurrentIndex, speechRate } = useReaderStore();

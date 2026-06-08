@@ -1,6 +1,12 @@
 // src/types/document.ts
 export type DocFormat = 'pdf' | 'docx' | 'txt';
 
+export interface ReadingMemory {
+  docId: string;
+  currentIndex: number;
+  updatedAt: number;
+}
+
 export interface Paragraph {
   id: string;
   index: number;
