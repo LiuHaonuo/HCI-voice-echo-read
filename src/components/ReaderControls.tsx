@@ -34,6 +34,13 @@ export const ReaderControls: React.FC = () => {
   const questionTextRef = useRef('');
   const recognitionRef = useRef<any>(null);
   const shouldRestartRef = useRef(false);
+  const isAnnotatingRef = useRef(isAnnotating);
+  const isAskingRef = useRef(isAsking);
+
+  useEffect(() => {
+    isAnnotatingRef.current = isAnnotating;
+    isAskingRef.current = isAsking;
+  }, [isAnnotating, isAsking]);
 
   useEffect(() => {
     const startTts = (payload: PlayRequestPayload) => {
@@ -165,6 +172,7 @@ export const ReaderControls: React.FC = () => {
       const commands = [
         { keyword: '批注', action: () => {
             shouldRestartRef.current = true;
+            isAnnotatingRef.current = true;
             setIsAnnotating(true);
             setAnnotationText('');
             annotationTextRef.current = '';
@@ -174,6 +182,7 @@ export const ReaderControls: React.FC = () => {
         },
         { keyword: '提问', action: () => {
             shouldRestartRef.current = true;
+            isAskingRef.current = true;
             setIsAsking(true);
             setQuestionText('');
             questionTextRef.current = '';
@@ -220,101 +229,124 @@ export const ReaderControls: React.FC = () => {
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'zh-CN';
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
     audioManager.acquire('stt');
     setStatus('listening');
-    if (!isAnnotating && !isAsking) {
+    if (!isAnnotatingRef.current && !isAskingRef.current) {
       setRecognizedText('');
     }
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
-      if (!isAnnotating && !isAsking) {
-        setRecognizedText(transcript);
-      }
+      setRecognizedText(transcript);
 
-      if (isAnnotating) {
+      // 批注模式处理
+      if (isAnnotatingRef.current) {
         const cleanedTranscript = transcript.trim();
-
         if (cleanedTranscript.includes('结束') || cleanedTranscript === '结束') {
+          shouldRestartRef.current = false;
+          recognition.stop();
           saveAnnotation();
           return;
         }
-
+        // 收集批注内容
         if (annotationTextRef.current && annotationTextRef.current.trim()) {
           annotationTextRef.current = annotationTextRef.current + ' ' + cleanedTranscript;
         } else {
           annotationTextRef.current = cleanedTranscript;
         }
         setAnnotationText(annotationTextRef.current);
-      } else if (isAsking) {
-        const cleanedTranscript = transcript.trim();
+        shouldRestartRef.current = true;
+        recognition.stop();
+        return;
+      }
 
+      // 提问模式处理
+      if (isAskingRef.current) {
+        const cleanedTranscript = transcript.trim();
         if (cleanedTranscript.includes('结束') || cleanedTranscript === '结束') {
+          shouldRestartRef.current = false;
+          recognition.stop();
           submitQuestion();
           return;
         }
-
+        // 收集提问内容
         if (questionTextRef.current && questionTextRef.current.trim()) {
           questionTextRef.current = questionTextRef.current + ' ' + cleanedTranscript;
         } else {
           questionTextRef.current = cleanedTranscript;
         }
         setQuestionText(questionTextRef.current);
-      } else {
-        const commands = [
-          { keyword: '批注', action: () => {
-              shouldRestartRef.current = true;
-              setIsAnnotating(true);
-              setAnnotationText('');
-              annotationTextRef.current = '';
-              setRecognizedText('批注模式已开启，请开始说您的批注内容，最后说"结束"来保存');
-            }
-          },
-          { keyword: '提问', action: () => {
-              shouldRestartRef.current = true;
-              setIsAsking(true);
-              setQuestionText('');
-              questionTextRef.current = '';
-              setRecognizedText('提问模式已开启，请开始说您的问题，最后说"结束"来提交');
-            }
-          },
-          { keyword: '播放', action: () => eventBus.emit('reader:play-request', { currentIndex, speechRate }) },
-          { keyword: '下一段', action: () => setCurrentIndex(currentIndex + 1) },
-          { keyword: '上一段', action: () => setCurrentIndex(currentIndex - 1) },
-          { keyword: '暂停', action: () => eventBus.emit('reader:pause-request') },
-          { keyword: '继续', action: () => eventBus.emit('reader:resume-request') },
-          { keyword: '继续播放', action: () => eventBus.emit('reader:resume-request') },
-        ];
+        shouldRestartRef.current = true;
+        recognition.stop();
+        return;
+      }
 
-        let commandFound = false;
-        for (const cmd of commands) {
-          if (transcript.includes(cmd.keyword)) {
-            cmd.action();
-            commandFound = true;
-            break;
+      // 正常命令模式
+      const wasPlayingBefore = window.speechSynthesis?.speaking;
+      
+      const commands = [
+        { keyword: '批注', action: () => {
+            shouldRestartRef.current = true;
+            isAnnotatingRef.current = true;
+            setIsAnnotating(true);
+            setAnnotationText('');
+            annotationTextRef.current = '';
+            setRecognizedText('已进入批注模式，请开始说您的批注内容，最后说"结束"来保存');
+            recognition.stop();
           }
-        }
+        },
+        { keyword: '提问', action: () => {
+            shouldRestartRef.current = true;
+            isAskingRef.current = true;
+            setIsAsking(true);
+            setQuestionText('');
+            questionTextRef.current = '';
+            setRecognizedText('已进入提问模式，请开始说您的问题，最后说"结束"来提交');
+            recognition.stop();
+          }
+        },
+        { keyword: '播放', action: () => eventBus.emit('reader:play-request', { currentIndex, speechRate }) },
+        { keyword: '下一段', action: () => setCurrentIndex(currentIndex + 1) },
+        { keyword: '上一段', action: () => setCurrentIndex(currentIndex - 1) },
+        { keyword: '暂停', action: () => eventBus.emit('reader:pause-request') },
+        { keyword: '继续', action: () => eventBus.emit('reader:resume-request') },
+        { keyword: '继续播放', action: () => eventBus.emit('reader:resume-request') },
+      ];
 
-        if (!commandFound) {
-          console.log(`[STT] 未识别的指令: ${transcript}`);
-          if (wasSpeaking) {
-            eventBus.emit('reader:resume-request');
-          }
+      let commandFound = false;
+      for (const cmd of commands) {
+        if (transcript.includes(cmd.keyword)) {
+          cmd.action();
+          commandFound = true;
+          break;
         }
       }
+
+      if (!commandFound) {
+        console.log(`[STT] 未识别的指令: ${transcript}`);
+        setRecognizedText(`未识别指令: ${transcript}`);
+        if (wasPlayingBefore) {
+          setTimeout(() => {
+            eventBus.emit('reader:resume-request');
+          }, 100);
+        }
+      }
+
+      recognition.stop();
     };
 
     recognition.onend = () => {
       audioManager.release('stt');
-      if (!isAnnotating && !isAsking) {
-        setStatus('idle');
-      } else if (shouldRestartRef.current) {
+      if (shouldRestartRef.current && (isAnnotatingRef.current || isAskingRef.current)) {
+        // 在批注或提问模式下自动重启监听
         setTimeout(() => {
-          startListening();
+          if (shouldRestartRef.current) {
+            startListening();
+          }
         }, 100);
       } else {
         setStatus('idle');
@@ -340,17 +372,21 @@ export const ReaderControls: React.FC = () => {
 
   const cancelAnnotation = () => {
     shouldRestartRef.current = false;
-    recognitionRef.current?.stop();
+    const currentRecognition = recognitionRef.current;
+    recognitionRef.current = null;
+    currentRecognition?.stop();
     setIsAnnotating(false);
     setAnnotationText('');
     annotationTextRef.current = '';
-    setRecognizedText('已取消备注');
+    setRecognizedText('已取消批注');
     setStatus('idle');
   };
 
   const finishAnnotation = () => {
     shouldRestartRef.current = false;
-    recognitionRef.current?.stop();
+    const currentRecognition = recognitionRef.current;
+    recognitionRef.current = null;
+    currentRecognition?.stop();
     if (annotationTextRef.current.trim()) {
       saveAnnotation();
     } else {
@@ -361,7 +397,9 @@ export const ReaderControls: React.FC = () => {
 
   const cancelQuestion = () => {
     shouldRestartRef.current = false;
-    recognitionRef.current?.stop();
+    const currentRecognition = recognitionRef.current;
+    recognitionRef.current = null;
+    currentRecognition?.stop();
     setIsAsking(false);
     setQuestionText('');
     questionTextRef.current = '';
@@ -371,7 +409,9 @@ export const ReaderControls: React.FC = () => {
 
   const finishQuestion = () => {
     shouldRestartRef.current = false;
-    recognitionRef.current?.stop();
+    const currentRecognition = recognitionRef.current;
+    recognitionRef.current = null;
+    currentRecognition?.stop();
     if (questionTextRef.current.trim()) {
       submitQuestion();
     } else {
@@ -803,8 +843,16 @@ export const ReaderControls: React.FC = () => {
 
         <button
           onClick={() => {
-            if (isAnnotating || isAsking) {
-              setShowVoicePanel(!showVoicePanel);
+            if (isAnnotating) {
+              // 如果在批注模式，点击按钮取消批注
+              cancelAnnotation();
+            } else if (isAsking) {
+              // 如果在提问模式，点击按钮取消提问
+              cancelQuestion();
+            } else if (isListening) {
+              recognitionRef.current?.stop();
+              setStatus('idle');
+              setRecognizedText('已停止语音监听');
             } else {
               if (useMockVoice) {
                 setShowMockInput(true);
@@ -813,7 +861,7 @@ export const ReaderControls: React.FC = () => {
               }
             }
           }}
-          disabled={isListening}
+          disabled={false}
           style={{
             width: '64px',
             height: '64px',
@@ -821,7 +869,7 @@ export const ReaderControls: React.FC = () => {
             border: '2px solid #2563eb',
             backgroundColor: isListening ? '#dc2626' : '#ffffff',
             color: isListening ? '#ffffff' : '#2563eb',
-            cursor: isListening ? 'wait' : 'pointer',
+            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -925,7 +973,14 @@ export const ReaderControls: React.FC = () => {
               justifyContent: 'flex-end'
             }}>
               <button
-                onClick={() => setShowMockInput(false)}
+                onClick={() => {
+                  setShowMockInput(false);
+                  if (isAnnotating) {
+                    cancelAnnotation();
+                  } else if (isAsking) {
+                    cancelQuestion();
+                  }
+                }}
                 style={{
                   padding: '6px 14px',
                   border: '1px solid #e2e8f0',

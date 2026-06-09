@@ -4,8 +4,10 @@
     "\\backend",
     "\\docs",
     "\\src",
+    "\\src\\components",
     "\\src\\voice",
     "\\src\\voice\\components"
   ],
+  "SelectedNode": "\\src\\components\\ReaderControls.tsx",
   "PreviewInSolutionExplorer": false
 }

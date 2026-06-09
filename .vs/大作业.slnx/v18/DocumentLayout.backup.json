@@ -52,7 +52,7 @@
               "RelativeDocumentMoniker": "src\\voice\\components\\VoiceControlPanel.tsx",
               "ToolTip": "D:\\\u7528\u6237\u4EA4\u4E92\u6280\u672F\\\u5927\u4F5C\u4E1A\\src\\voice\\components\\VoiceControlPanel.tsx",
               "RelativeToolTip": "src\\voice\\components\\VoiceControlPanel.tsx",
-              "ViewState": "AgIAAB0BAAAAAAAAAAAAAEQBAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAOEAAAAAAAAAAAAAAPAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2026-06-07T11:56:23.887Z",
               "EditorCaption": ""
@@ -91,8 +91,7 @@
               "RelativeToolTip": "docs\\document (1).md",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAADAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
-              "WhenOpened": "2026-06-05T15:57:37.31Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-05T15:57:37.31Z"
             },
             {
               "$type": "Document",
