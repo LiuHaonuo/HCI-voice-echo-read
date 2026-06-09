@@ -236,7 +236,7 @@ def parse_pdf_backend():
                 # 判断当前缓冲池的最后一个字符是不是句末标点
                 is_end_with_punct = any(current_buffer.endswith(p) for p in ['。', '？', '！', '.', '?', '!', ':', '：'])
                 # 如果没到标点，且上一行长度不够（说明是自然换行被意外截断了），则视为同一段话
-                if not is_end_with_punct and len(current_buffer) >30 :
+                if not is_end_with_punct and len(current_buffer) > 30:
                     current_buffer += line
                 else:
                     merged_paragraphs.append(current_buffer)

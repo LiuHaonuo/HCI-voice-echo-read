@@ -32,30 +32,28 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
     set({ parseStatus: 'parsing' });
     try {
       let parseFn = (DocumentParserModule as any).parseDocument || (DocumentParserModule as any).default;
-      
+
       if (!parseFn || typeof parseFn !== 'function') {
         throw new Error('未在 documentParser 中找到有效的解析函数');
       }
 
       const documentData = await parseFn(file);
       const historyIndex = (memoryService && typeof memoryService.load === 'function') 
-        ? (memoryService.load(documentData.id) || 0) 
+        ? (memoryService.load(documentData.id) || 0)
         : 0;
 
-      // 保存到本地缓存
       if (memoryService && typeof memoryService.saveDocument === 'function') {
         memoryService.saveDocument(documentData);
       }
 
-      // 更新缓存列表
       set((state) => ({
         cachedDocs: [documentData, ...state.cachedDocs.filter(d => d.id !== documentData.id)]
       }));
 
-      set({ 
-        currentDoc: documentData, 
-        currentIndex: historyIndex, 
-        parseStatus: 'ready' 
+      set({
+        currentDoc: documentData,
+        currentIndex: historyIndex,
+        parseStatus: 'ready'
       });
 
       eventBus.emit('reader:doc-changed', documentData);
@@ -70,10 +68,10 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
     set({ currentDoc: doc, currentIndex: historyIndex, parseStatus: 'ready' });
     eventBus.emit('reader:doc-changed', doc);
   },
-  
+
   setCurrentIndex: (index) => set((state) => {
     if (!state.currentDoc || index < 0 || index >= state.currentDoc.paragraphs.length) return state;
-    
+
     if (memoryService && typeof memoryService.save === 'function') {
       memoryService.save(state.currentDoc.id, index);
     }
@@ -81,15 +79,14 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
     eventBus.emit('reader:paragraph-change', { index, paragraph: state.currentDoc.paragraphs[index] });
     return { currentIndex: index };
   }),
-  
+
   setSpeechRate: (rate) => set(() => {
     eventBus.emit('reader:speech-rate-change', { speechRate: rate });
     return { speechRate: rate };
   }),
-  
+
   setParseStatus: (status) => set({ parseStatus: status }),
 
-  // 加载缓存的文档
   loadCachedDocument: (docId: string) => {
     const doc = memoryService.getDocument(docId);
     if (doc) {
@@ -97,18 +94,15 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
     }
   },
 
-  // 删除缓存的文档
   removeCachedDocument: (docId: string) => {
     memoryService.deleteDocument(docId);
     set((state) => ({
       cachedDocs: state.cachedDocs.filter(d => d.id !== docId),
-      // 如果删除的是当前文档，清空当前文档
       currentDoc: state.currentDoc?.id === docId ? null : state.currentDoc,
       currentIndex: state.currentDoc?.id === docId ? 0 : state.currentIndex
     }));
   },
 
-  // 加载所有缓存文档列表
   loadCachedDocs: () => {
     const docs = memoryService.getAllDocuments();
     set({ cachedDocs: docs });

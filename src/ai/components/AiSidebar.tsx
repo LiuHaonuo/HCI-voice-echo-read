@@ -1,8 +1,8 @@
-// src/ai/components/AiSidebar.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReaderStore } from '../../store/readerStore';
 import { useAiStore } from '../store/aiStore';
 import { promptBuilder } from '../utils/promptBuilder';
+import { SpeechRecognitionService, SpeechRecognitionResult } from '../../voice/utils';
 
 interface AiSidebarProps {
   isCollapsed: boolean;
@@ -11,24 +11,73 @@ interface AiSidebarProps {
 
 export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) => {
   const { currentDoc, currentIndex } = useReaderStore();
-  const { 
-    qaHistory, 
-    isLoading, 
-    error, 
-    askQuestion, 
+  const {
+    qaHistory,
+    isLoading,
+    error,
+    askQuestion,
     clearError,
     currentModel,
     availableModels,
     switchModel,
-    initializeService 
+    initializeService
   } = useAiStore();
   const [customQuestion, setCustomQuestion] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
+  
+  // 语音识别服务引用
+  const speechServiceRef = useRef<SpeechRecognitionService | null>(null);
 
   useEffect(() => {
     initializeService();
   }, [initializeService]);
+
+  // 初始化语音识别服务
+  useEffect(() => {
+    speechServiceRef.current = new SpeechRecognitionService(
+      {
+        lang: 'zh-CN',
+        continuous: false,
+        interimResults: false,
+        maxAlternatives: 1
+      },
+      {
+        onResult: handleRecognitionResult,
+        onError: handleRecognitionError,
+        onEnd: handleRecognitionEnd,
+        onStart: () => setIsRecording(true)
+      }
+    );
+
+    return () => {
+      speechServiceRef.current?.stop();
+    };
+  }, []);
+
+  // 处理语音识别结果
+  const handleRecognitionResult = useCallback((result: SpeechRecognitionResult) => {
+    const text = result.transcript;
+    setRecognizedText(text);
+    setCustomQuestion(text);
+    
+    if (currentDoc && text.trim()) {
+      clearError();
+      askQuestion(text, currentIndex);
+    }
+  }, [currentDoc, currentIndex, clearError, askQuestion]);
+
+  // 处理识别错误
+  const handleRecognitionError = useCallback((error: Error) => {
+    console.error('[AI Voice Input] 语音识别错误:', error);
+    setIsRecording(false);
+    alert('语音识别失败: ' + error.message);
+  }, []);
+
+  // 处理识别结束
+  const handleRecognitionEnd = useCallback(() => {
+    setIsRecording(false);
+  }, []);
 
   const quickQuestions = promptBuilder.buildQuickQuestionPrompts();
 
@@ -48,27 +97,20 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
 
   const filteredHistory = qaHistory.filter(qa => qa.paragraphIndex === currentIndex);
 
-  // 使用与批注相同的语音输入接口
   const handleVoiceInput = () => {
-    setIsRecording(true);
-    // 模拟语音输入（与批注组件相同的接口）
-    setTimeout(() => {
-      const mockNote = window.prompt("🎤 语音转写，请输入问题（模拟）:", "这是什么意思？");
-      if (mockNote) {
-        setRecognizedText(mockNote);
-        setCustomQuestion(mockNote);
-        if (currentDoc) {
-          clearError();
-          askQuestion(mockNote, currentIndex);
-        }
-      }
+    if (isRecording) {
+      // 如果正在录音，停止录音
+      speechServiceRef.current?.stop();
       setIsRecording(false);
-    }, 500);
+    } else {
+      // 如果未在录音，开始录音
+      setRecognizedText('');
+      speechServiceRef.current?.start();
+    }
   };
 
   if (!currentDoc) return null;
 
-  // 收起状态只显示切换按钮
   if (isCollapsed) {
     return (
       <div style={{
@@ -100,7 +142,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
         >
           ◀
         </button>
-        
+
         <div style={{
           writingMode: 'vertical-rl',
           textOrientation: 'mixed',
@@ -125,7 +167,6 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
       borderLeft: '1px solid #e2e8f0',
       transition: 'width 0.3s ease'
     }}>
-      {/* 顶部标题栏 */}
       <div style={{
         padding: '12px 16px',
         borderBottom: '1px solid #e2e8f0',
@@ -144,7 +185,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
             fontWeight: '600',
             color: '#1e293b'
           }}>
-            💬 AI 助手
+            🤖 AI 助手
           </span>
           <select
             value={currentModel}
@@ -165,7 +206,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
             ))}
           </select>
         </div>
-        
+
         <button
           onClick={onToggle}
           style={{
@@ -188,7 +229,6 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
         </button>
       </div>
 
-      {/* 内容区域 */}
       <div style={{
         flex: 1,
         padding: '12px',
@@ -197,7 +237,6 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
         overflow: 'hidden',
         gap: '12px'
       }}>
-        {/* 错误提示 */}
         {error && (
           <div style={{
             padding: '10px',
@@ -225,7 +264,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
                 {error}
               </p>
             </div>
-            <button 
+            <button
               onClick={clearError}
               style={{
                 fontSize: '11px',
@@ -241,7 +280,6 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
           </div>
         )}
 
-        {/* 历史记录 */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -263,7 +301,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
                 color: '#2563eb',
                 margin: '0 0 6px 0'
               }}>
-                {qa.paragraphIndex !== currentIndex && `[§${qa.paragraphIndex + 1}] `}
+                {qa.paragraphIndex !== currentIndex && `[段落 ${qa.paragraphIndex + 1}] `}
                 问: {qa.question}
               </p>
               <p style={{
@@ -276,7 +314,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
               </p>
             </div>
           ))}
-          
+
           {isLoading && (
             <p style={{
               fontSize: '12px',
@@ -287,7 +325,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
               {currentModel} 正在思考中...
             </p>
           )}
-          
+
           {filteredHistory.length === 0 && !isLoading && (
             <p style={{
               fontSize: '12px',
@@ -295,12 +333,11 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
               textAlign: 'center',
               padding: '24px 0'
             }}>
-              选择一个问题，让 AI 为您解答
+              选择一个问题，让 AI 为你解答
             </p>
           )}
         </div>
 
-        {/* 最近识别 */}
         {recognizedText && (
           <div style={{
             padding: '8px 10px',
@@ -313,7 +350,6 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
           </div>
         )}
 
-        {/* 快捷问题 */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -342,19 +378,17 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
           ))}
         </div>
 
-        {/* 输入区域 */}
         <form onSubmit={handleCustomQuestion} style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
           flexShrink: 0
         }}>
-          {/* 输入框占满宽度 */}
           <input
             type="text"
             value={customQuestion}
             onChange={(e) => setCustomQuestion(e.target.value)}
-            placeholder="输入您的问题..."
+            placeholder="输入你的问题..."
             disabled={isLoading}
             style={{
               width: '100%',
@@ -366,11 +400,10 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
               boxSizing: 'border-box',
               transition: 'border-color 0.2s'
             }}
-            onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+            onFocus={(e) => e.currentTarget.style.borderColor = '#2563eb'}
+            onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
           />
-          
-          {/* 麦克风和发送按钮位于右下 */}
+
           <div style={{
             display: 'flex',
             justifyContent: 'flex-end',
@@ -396,9 +429,9 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
               }}
               title="语音输入"
             >
-              {isRecording ? '🔴' : '🎤'}
+              {isRecording ? '🎙️' : '🎤'}
             </button>
-            
+
             <button
               type="submit"
               disabled={isLoading || !customQuestion.trim()}

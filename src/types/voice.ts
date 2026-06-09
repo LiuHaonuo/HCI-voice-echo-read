@@ -8,6 +8,7 @@ export interface ParagraphAnnotation {
   paragraphIndex: number;
   text: string;
   createdAt: number;
+  updatedAt?: number;
   source: 'voice' | 'manual';
   updatedAt?: number;
 }

@@ -30,7 +30,7 @@ interface AiState {
 }
 
 export const useAiStore = create<AiState>((set, get) => ({
-  currentModel: 'gemini',
+  currentModel: 'deepseek',
   availableModels: [],
   isConfigured: false,
   qaHistory: [],

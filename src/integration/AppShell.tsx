@@ -23,7 +23,7 @@ export const AppShell: React.FC = () => {
       backgroundColor: '#f1f5f9',
       fontFamily: 'sans-serif'
     }}>
-      {/* 左侧侧边栏：文件上传和项目标题 */}
+      {/* 左侧侧边栏：文件上传和文档列表 */}
       <Sidebar />
 
       {/* 中间阅读区 */}
@@ -38,15 +38,15 @@ export const AppShell: React.FC = () => {
       }}>
         {/* 段落列表区域 */}
         <ParagraphList />
-        
+
         {/* 播放控制栏 */}
         <div style={{ flexShrink: 0 }}>
           <ReaderControls />
         </div>
       </div>
 
-      {/* 右侧 AI 侧栏（可收起） */}
-      <AiSidebar 
+      {/* 右侧 AI 侧边栏（可折叠） */}
+      <AiSidebar
         isCollapsed={isAiSidebarCollapsed}
         onToggle={() => setIsAiSidebarCollapsed(!isAiSidebarCollapsed)}
       />

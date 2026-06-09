@@ -93,7 +93,7 @@ export const ParagraphList: React.FC = () => {
               position: 'relative'
             }}
           >
-            <div 
+            <div
               onClick={() => setCurrentIndex && setCurrentIndex(idx)}
               style={{
                 display: 'flex',
@@ -176,7 +176,7 @@ export const ParagraphList: React.FC = () => {
                     transition: 'all 0.2s'
                   }}
                 >
-                  {isExpanded ? '▲' : '▼'}
+                  {isExpanded ? '▼' : '▲'}
                 </button>
               </div>
             </div>

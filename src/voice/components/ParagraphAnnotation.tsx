@@ -1,8 +1,7 @@
-// src/voice/components/ParagraphAnnotation.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVoiceStore } from '../store/voiceStore';
-import { useReaderStore } from '../../store/readerStore';
 import { ParagraphAnnotation as AnnotationType } from '../../types/voice';
+import { SpeechRecognitionService, SpeechRecognitionResult } from '../utils';
 
 interface ParagraphAnnotationProps {
   docId: string;
@@ -11,11 +10,11 @@ interface ParagraphAnnotationProps {
   onClose: () => void;
 }
 
-export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({ 
-  docId, 
-  paragraphIndex, 
-  annotations, 
-  onClose 
+export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
+  docId,
+  paragraphIndex,
+  annotations,
+  onClose
 }) => {
   const { addAnnotation, updateAnnotation, deleteAnnotation } = useVoiceStore();
   const [inputText, setInputText] = useState('');
@@ -24,15 +23,65 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
   const [editText, setEditText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // 语音识别服务引用
+  const speechServiceRef = useRef<SpeechRecognitionService | null>(null);
 
-  // 自动聚焦到文本框
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
   }, []);
 
-  // 编辑时聚焦到编辑框
+  // 初始化语音识别服务
+  useEffect(() => {
+    speechServiceRef.current = new SpeechRecognitionService(
+      {
+        lang: 'zh-CN',
+        continuous: false,
+        interimResults: false,
+        maxAlternatives: 1
+      },
+      {
+        onResult: handleRecognitionResult,
+        onError: handleRecognitionError,
+        onEnd: handleRecognitionEnd,
+        onStart: () => setIsRecording(true)
+      }
+    );
+
+    return () => {
+      speechServiceRef.current?.stop();
+    };
+  }, []);
+
+  // 处理语音识别结果
+  const handleRecognitionResult = useCallback((result: SpeechRecognitionResult) => {
+    const text = result.transcript;
+    if (text.trim()) {
+      addAnnotation(docId, {
+        id: `ann-${Date.now()}`,
+        docId,
+        paragraphIndex,
+        text: text.trim(),
+        createdAt: Date.now(),
+        source: 'voice'
+      });
+    }
+  }, [addAnnotation, docId, paragraphIndex]);
+
+  // 处理识别错误
+  const handleRecognitionError = useCallback((error: Error) => {
+    console.error('[Annotation Voice Input] 语音识别错误:', error);
+    setIsRecording(false);
+    alert('语音识别失败: ' + error.message);
+  }, []);
+
+  // 处理识别结束
+  const handleRecognitionEnd = useCallback(() => {
+    setIsRecording(false);
+  }, []);
+
   useEffect(() => {
     if (editingId && editInputRef.current) {
       editInputRef.current.focus();
@@ -42,7 +91,7 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
 
   const handleAddManualNote = () => {
     if (!inputText.trim()) return;
-    
+
     addAnnotation(docId, {
       id: `ann-${Date.now()}`,
       docId,
@@ -51,36 +100,26 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
       createdAt: Date.now(),
       source: 'manual'
     });
-    
+
     setInputText('');
   };
 
-  const handleRecordNoteMock = () => {
-    setIsRecording(true);
-    // 模拟语音输入
-    setTimeout(() => {
-      const mockNote = window.prompt("🎤 语音转写，请输入批注内容（模拟）:", "这部分需要重点复习。");
-      if (mockNote) {
-        addAnnotation(docId, {
-          id: `ann-${Date.now()}`,
-          docId,
-          paragraphIndex,
-          text: mockNote,
-          createdAt: Date.now(),
-          source: 'voice'
-        });
-      }
+  const handleRecordNote = () => {
+    if (isRecording) {
+      // 如果正在录音，停止录音
+      speechServiceRef.current?.stop();
       setIsRecording(false);
-    }, 500);
+    } else {
+      // 如果未在录音，开始录音
+      speechServiceRef.current?.start();
+    }
   };
 
-  // 开始编辑
   const handleStartEdit = (ann: AnnotationType) => {
     setEditingId(ann.id);
     setEditText(ann.text);
   };
 
-  // 保存编辑
   const handleSaveEdit = () => {
     if (editingId && editText.trim()) {
       updateAnnotation(docId, editingId, editText.trim());
@@ -89,13 +128,11 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
     }
   };
 
-  // 取消编辑
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditText('');
   };
 
-  // 编辑时按 Enter 保存
   const handleEditKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -127,7 +164,6 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
       paddingTop: '12px',
       borderTop: '1px solid #e2e8f0'
     }}>
-      {/* 现有批注列表 */}
       {annotations.length > 0 && (
         <div style={{
           display: 'flex',
@@ -146,7 +182,6 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
                 borderColor: ann.source === 'voice' ? '#fed7aa' : '#bfdbfe'
               }}
             >
-              {/* 头部信息 */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -159,7 +194,7 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
                   gap: '6px'
                 }}>
                   <span style={{ fontSize: '12px' }}>
-                    {ann.source === 'voice' ? '🎤' : '✏️'}
+                    {ann.source === 'voice' ? '🎤' : '✍️'}
                   </span>
                   <span style={{
                     fontSize: '11px',
@@ -169,7 +204,7 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
                     {ann.updatedAt ? `${formatTime(ann.createdAt)} (已编辑)` : formatTime(ann.createdAt)}
                   </span>
                 </div>
-                
+
                 {editingId !== ann.id && (
                   <div style={{
                     display: 'flex',
@@ -213,13 +248,12 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
                       }}
                       title="删除"
                     >
-                      ✕
+                      🗑️
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* 内容区域 */}
               {editingId === ann.id ? (
                 <div style={{
                   display: 'flex',
@@ -302,7 +336,6 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
         </div>
       )}
 
-      {/* 添加新批注区域 */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -352,7 +385,7 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
             gap: '8px'
           }}>
             <button
-              onClick={handleRecordNoteMock}
+              onClick={handleRecordNote}
               disabled={isRecording}
               style={{
                 padding: '8px 14px',
@@ -390,7 +423,7 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
                 transition: 'all 0.2s'
               }}
             >
-              <span>✏️</span>
+              <span>✍️</span>
               <span>添加批注</span>
             </button>
           </div>

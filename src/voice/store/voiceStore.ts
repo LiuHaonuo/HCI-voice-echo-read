@@ -11,6 +11,8 @@ interface VoiceState {
   annotations: { [docId: string]: ParagraphAnnotation[] };
   setStatus: (status: VoiceStatus) => void;
   setIsPlaying: (isPlaying: boolean) => void;
+  setIsAnnotating: (isAnnotating: boolean) => void;
+  setIsAsking: (isAsking: boolean) => void;
   addAnnotation: (docId: string, ann: ParagraphAnnotation) => void;
   updateAnnotation: (docId: string, annId: string, text: string) => void;
   deleteAnnotation: (docId: string, annId: string) => void;
@@ -40,10 +42,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   isAnnotating: false,
   isAsking: false,
   annotations: {},
-  
+
   setStatus: (status) => set({ status }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
-  
+  setIsAnnotating: (isAnnotating) => set({ isAnnotating }),
+  setIsAsking: (isAsking) => set({ isAsking }),
+
   addAnnotation: (docId, ann) => set((state) => {
     const currentAnns = state.annotations[docId] || loadFromStorage(docId);
     const newAnns = [...currentAnns, ann];
@@ -58,7 +62,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
 
   updateAnnotation: (docId, annId, text) => set((state) => {
     const currentAnns = state.annotations[docId] || loadFromStorage(docId);
-    const newAnns = currentAnns.map(a => 
+    const newAnns = currentAnns.map(a =>
       a.id === annId ? { ...a, text, updatedAt: Date.now() } : a
     );
     saveToStorage(docId, newAnns);

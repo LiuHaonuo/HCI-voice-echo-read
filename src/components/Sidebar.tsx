@@ -1,11 +1,10 @@
-// src/components/Sidebar.tsx
 import React, { useRef, useEffect } from 'react';
 import { useReaderStore } from '../store/readerStore';
 
 export const Sidebar: React.FC = () => {
-  const { 
-    uploadAndParseFile, 
-    parseStatus, 
+  const {
+    uploadAndParseFile,
+    parseStatus,
     currentDoc,
     cachedDocs,
     loadCachedDocument,
@@ -14,7 +13,6 @@ export const Sidebar: React.FC = () => {
   } = useReaderStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 初始化时加载缓存文档列表
   useEffect(() => {
     loadCachedDocs();
   }, [loadCachedDocs]);
@@ -56,7 +54,6 @@ export const Sidebar: React.FC = () => {
       padding: '16px',
       boxSizing: 'border-box'
     }}>
-      {/* 项目标题 */}
       <div style={{
         marginBottom: '24px',
         textAlign: 'center',
@@ -81,19 +78,18 @@ export const Sidebar: React.FC = () => {
         </p>
       </div>
 
-      {/* 文件上传区域 */}
       <div style={{
         marginBottom: '20px'
       }}>
-        <input 
-          type="file" 
+        <input
+          type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
           accept=".txt,.pdf,.docx"
           style={{ display: 'none' }}
         />
-        
-        <button 
+
+        <button
           onClick={() => fileInputRef.current?.click()}
           disabled={parseStatus === 'parsing'}
           style={{
@@ -118,7 +114,6 @@ export const Sidebar: React.FC = () => {
         </button>
       </div>
 
-      {/* 文件列表 */}
       <div style={{
         flex: 1,
         overflowY: 'auto'
@@ -144,7 +139,7 @@ export const Sidebar: React.FC = () => {
             {cachedDocs.length} 个
           </span>
         </div>
-        
+
         {cachedDocs.length === 0 ? (
           <div style={{
             padding: '24px 12px',
@@ -183,6 +178,14 @@ export const Sidebar: React.FC = () => {
                     gap: '10px',
                     position: 'relative'
                   }}
+                  onMouseEnter={(e) => {
+                    const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                    if (deleteBtn) deleteBtn.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                    if (deleteBtn) deleteBtn.style.opacity = '0';
+                  }}
                 >
                   <span style={{ fontSize: '18px', flexShrink: 0 }}>
                     {getFileIcon(doc.fileName)}
@@ -207,10 +210,11 @@ export const Sidebar: React.FC = () => {
                       color: '#94a3b8',
                       margin: '2px 0 0 0'
                     }}>
-                      {doc.paragraphs.length} 段 | {doc.format.toUpperCase()}
+                      {doc.paragraphs.length} 段 · {doc.format.toUpperCase()}
                     </p>
                   </div>
                   <button
+                    className="delete-btn"
                     onClick={(e) => handleDeleteDoc(e, doc.id)}
                     style={{
                       width: '24px',
@@ -227,7 +231,7 @@ export const Sidebar: React.FC = () => {
                       transition: 'all 0.2s'
                     }}
                   >
-                    ✕
+                    🗑️
                   </button>
                 </div>
               );
@@ -236,7 +240,6 @@ export const Sidebar: React.FC = () => {
         )}
       </div>
 
-      {/* 底部提示 */}
       <div style={{
         marginTop: '16px',
         paddingTop: '12px',
