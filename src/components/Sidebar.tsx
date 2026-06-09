@@ -37,10 +37,10 @@ export const Sidebar: React.FC = () => {
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') return '📄';
-    if (ext === 'docx') return '📝';
-    if (ext === 'txt') return '📃';
-    return '📁';
+    if (ext === 'pdf') return '📕';
+    if (ext === 'docx') return '📘';
+    if (ext === 'txt') return '📗';
+    return '📄';
   };
 
   return (

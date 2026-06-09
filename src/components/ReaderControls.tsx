@@ -6,6 +6,8 @@ import { useAiStore } from '../ai/store/aiStore';
 import { eventBus } from '../integration/EventBus';
 import { audioManager } from '../integration/AudioManager';
 
+const MAX_DISPLAY_LENGTH = 10;
+
 interface PlayRequestPayload {
   currentIndex: number;
   speechRate: number;
@@ -688,7 +690,7 @@ export const ReaderControls: React.FC = () => {
             transition: 'all 0.2s'
           }}
         >
-          ⏮️
+          ⏮
         </button>
 
         <button
@@ -709,28 +711,7 @@ export const ReaderControls: React.FC = () => {
             transition: 'all 0.2s'
           }}
         >
-          {isPlaying ? '⏸️' : '▶️'}
-        </button>
-
-        <button
-          onClick={handleResumeRequest}
-          disabled={isPlaying}
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            border: 'none',
-            backgroundColor: isPlaying ? '#f1f5f9' : '#f8fafc',
-            color: isPlaying ? '#94a3b8' : '#64748b',
-            cursor: isPlaying ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '16px',
-            transition: 'all 0.2s'
-          }}
-        >
-          ▶️
+          {isPlaying ? '⏸' : '️▶'}
         </button>
 
         <button
@@ -751,7 +732,7 @@ export const ReaderControls: React.FC = () => {
             transition: 'all 0.2s'
           }}
         >
-          ⏭️
+          ⏭
         </button>
 
         {/* 语速调节 */}
@@ -1036,7 +1017,10 @@ export const ReaderControls: React.FC = () => {
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
             }}>
-              {recognizedText}
+              {recognizedText.length > MAX_DISPLAY_LENGTH
+                ? recognizedText.substring(0, MAX_DISPLAY_LENGTH) + '...'
+                : recognizedText
+              }
             </p>
           </div>
         )}

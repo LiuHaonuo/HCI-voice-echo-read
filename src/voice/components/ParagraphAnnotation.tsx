@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVoiceStore } from '../store/voiceStore';
 import { ParagraphAnnotation as AnnotationType } from '../../types/voice';
+import { SpeechRecognitionService, SpeechRecognitionResult } from '../utils';
 
 interface ParagraphAnnotationProps {
   docId: string;
@@ -22,11 +23,63 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
   const [editText, setEditText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // 语音识别服务引用
+  const speechServiceRef = useRef<SpeechRecognitionService | null>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
+  }, []);
+
+  // 初始化语音识别服务
+  useEffect(() => {
+    speechServiceRef.current = new SpeechRecognitionService(
+      {
+        lang: 'zh-CN',
+        continuous: false,
+        interimResults: false,
+        maxAlternatives: 1
+      },
+      {
+        onResult: handleRecognitionResult,
+        onError: handleRecognitionError,
+        onEnd: handleRecognitionEnd,
+        onStart: () => setIsRecording(true)
+      }
+    );
+
+    return () => {
+      speechServiceRef.current?.stop();
+    };
+  }, []);
+
+  // 处理语音识别结果
+  const handleRecognitionResult = useCallback((result: SpeechRecognitionResult) => {
+    const text = result.transcript;
+    if (text.trim()) {
+      addAnnotation(docId, {
+        id: `ann-${Date.now()}`,
+        docId,
+        paragraphIndex,
+        text: text.trim(),
+        createdAt: Date.now(),
+        source: 'voice'
+      });
+    }
+  }, [addAnnotation, docId, paragraphIndex]);
+
+  // 处理识别错误
+  const handleRecognitionError = useCallback((error: Error) => {
+    console.error('[Annotation Voice Input] 语音识别错误:', error);
+    setIsRecording(false);
+    alert('语音识别失败: ' + error.message);
+  }, []);
+
+  // 处理识别结束
+  const handleRecognitionEnd = useCallback(() => {
+    setIsRecording(false);
   }, []);
 
   useEffect(() => {
@@ -51,22 +104,15 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
     setInputText('');
   };
 
-  const handleRecordNoteMock = () => {
-    setIsRecording(true);
-    setTimeout(() => {
-      const mockNote = window.prompt('🎤 语音转写，请输入批注内容（模拟）:', '这部分需要重点复习。');
-      if (mockNote) {
-        addAnnotation(docId, {
-          id: `ann-${Date.now()}`,
-          docId,
-          paragraphIndex,
-          text: mockNote,
-          createdAt: Date.now(),
-          source: 'voice'
-        });
-      }
+  const handleRecordNote = () => {
+    if (isRecording) {
+      // 如果正在录音，停止录音
+      speechServiceRef.current?.stop();
       setIsRecording(false);
-    }, 500);
+    } else {
+      // 如果未在录音，开始录音
+      speechServiceRef.current?.start();
+    }
   };
 
   const handleStartEdit = (ann: AnnotationType) => {
@@ -339,7 +385,7 @@ export const ParagraphAnnotation: React.FC<ParagraphAnnotationProps> = ({
             gap: '8px'
           }}>
             <button
-              onClick={handleRecordNoteMock}
+              onClick={handleRecordNote}
               disabled={isRecording}
               style={{
                 padding: '8px 14px',

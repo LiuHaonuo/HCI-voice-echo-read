@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useReaderStore } from '../../store/readerStore';
 import { useAiStore } from '../store/aiStore';
 import { promptBuilder } from '../utils/promptBuilder';
+import { SpeechRecognitionService, SpeechRecognitionResult } from '../../voice/utils';
 
 interface AiSidebarProps {
   isCollapsed: boolean;
@@ -24,10 +25,59 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
   const [customQuestion, setCustomQuestion] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
+  
+  // 语音识别服务引用
+  const speechServiceRef = useRef<SpeechRecognitionService | null>(null);
 
   useEffect(() => {
     initializeService();
   }, [initializeService]);
+
+  // 初始化语音识别服务
+  useEffect(() => {
+    speechServiceRef.current = new SpeechRecognitionService(
+      {
+        lang: 'zh-CN',
+        continuous: false,
+        interimResults: false,
+        maxAlternatives: 1
+      },
+      {
+        onResult: handleRecognitionResult,
+        onError: handleRecognitionError,
+        onEnd: handleRecognitionEnd,
+        onStart: () => setIsRecording(true)
+      }
+    );
+
+    return () => {
+      speechServiceRef.current?.stop();
+    };
+  }, []);
+
+  // 处理语音识别结果
+  const handleRecognitionResult = useCallback((result: SpeechRecognitionResult) => {
+    const text = result.transcript;
+    setRecognizedText(text);
+    setCustomQuestion(text);
+    
+    if (currentDoc && text.trim()) {
+      clearError();
+      askQuestion(text, currentIndex);
+    }
+  }, [currentDoc, currentIndex, clearError, askQuestion]);
+
+  // 处理识别错误
+  const handleRecognitionError = useCallback((error: Error) => {
+    console.error('[AI Voice Input] 语音识别错误:', error);
+    setIsRecording(false);
+    alert('语音识别失败: ' + error.message);
+  }, []);
+
+  // 处理识别结束
+  const handleRecognitionEnd = useCallback(() => {
+    setIsRecording(false);
+  }, []);
 
   const quickQuestions = promptBuilder.buildQuickQuestionPrompts();
 
@@ -48,19 +98,15 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
   const filteredHistory = qaHistory.filter(qa => qa.paragraphIndex === currentIndex);
 
   const handleVoiceInput = () => {
-    setIsRecording(true);
-    setTimeout(() => {
-      const mockNote = window.prompt('🎤 语音转写，请输入问题（模拟）:', '这是什么意思？');
-      if (mockNote) {
-        setRecognizedText(mockNote);
-        setCustomQuestion(mockNote);
-        if (currentDoc) {
-          clearError();
-          askQuestion(mockNote, currentIndex);
-        }
-      }
+    if (isRecording) {
+      // 如果正在录音，停止录音
+      speechServiceRef.current?.stop();
       setIsRecording(false);
-    }, 500);
+    } else {
+      // 如果未在录音，开始录音
+      setRecognizedText('');
+      speechServiceRef.current?.start();
+    }
   };
 
   if (!currentDoc) return null;
@@ -405,7 +451,7 @@ export const AiSidebar: React.FC<AiSidebarProps> = ({ isCollapsed, onToggle }) =
               }}
               title="发送"
             >
-              →
+              ↑
             </button>
           </div>
         </form>
