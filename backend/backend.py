@@ -2,8 +2,20 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# 加载 .env 文件
-load_dotenv()
+# 获取可执行文件所在目录（支持打包后的可执行文件）
+if getattr(sys, 'frozen', False):
+    # 打包后的可执行文件路径
+    application_path = os.path.dirname(sys.executable)
+    # PyInstaller 打包时的临时目录，包含静态文件
+    bundle_dir = sys._MEIPASS
+else:
+    # 开发模式下的脚本路径
+    application_path = os.path.dirname(os.path.abspath(__file__))
+    bundle_dir = application_path
+
+# 加载 .env 文件（从应用程序目录读取）
+env_path = os.path.join(application_path, '.env')
+load_dotenv(env_path)
 
 # 清除可能影响网络请求的代理环境变量
 for var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'GITHUB_TOKEN', 'GITHUB_ACTOR']:
@@ -14,9 +26,17 @@ from flask_cors import CORS
 import re
 import requests
 
-import os
+# 设置静态文件目录（支持打包后的路径）
+# 优先从打包的临时目录读取
+static_folder = os.path.join(bundle_dir, 'dist')
+if not os.path.exists(static_folder):
+    # 如果不存在，尝试从应用程序目录的上级目录读取
+    static_folder = os.path.join(application_path, '../dist')
+if not os.path.exists(static_folder):
+    # 最后尝试从应用程序目录读取
+    static_folder = os.path.join(application_path, 'dist')
 
-app = Flask(__name__, static_folder='../dist', static_url_path='')
+app = Flask(__name__, static_folder=static_folder, static_url_path='')
 CORS(app)
 
 @app.route('/')

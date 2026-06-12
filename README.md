@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# Voice Echo Read
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个集成了文档阅读、语音控制和 AI 问答功能的 Web 应用。
+项目地址：https://github.com/LiuHaonuo/HCI-voice-echo-read
 
-Currently, two official plugins are available:
+## 功能特性
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 📄 支持多种文档格式（PDF、Word 等）
+- 🎤 语音控制文档阅读
+- 🤖 AI 智能问答（支持多个 AI 模型）
+- 📝 文档标注和笔记功能
+- 🎨 现代化的用户界面
 
-## React Compiler
+## 本地构建启动
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 前端构建
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# 安装依赖
+npm install
+# 开发模式启动
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 后端启动
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# 进入后端目录
+cd backend
+# 创建虚拟环境（首次运行）
+python -m venv venv
+# 激活虚拟环境
+venv\Scripts\activate
+# 安装依赖
+pip install -r requirements.txt
+# 启动后端服务
+python backend.py
 ```
+
+### 配置 AI 密钥
+
+在 `backend` 目录下复制 `.env.example` 文件为 `.env`，然后配置你的 AI API 密钥：
+
+```env
+# DeepSeek API 配置
+DEEPSEEK_API_KEY=your-deepseek-api-key
+
+# 通义千问 API 配置
+TONGYI_API_KEY=your-tongyi-api-key
+
+# MiniMax API 配置
+MINIMAX_API_KEY=your-minimax-api-key
+
+# 百度千帆 API 配置
+QIANFAN_API_KEY=your-qianfan-api-key
+```
+
+### 访问应用
+
+按照命令行提示启动前端应用(`http://localhost:5173`)
