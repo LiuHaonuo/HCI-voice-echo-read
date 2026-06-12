@@ -10,5 +10,4 @@ export interface ParagraphAnnotation {
   createdAt: number;
   updatedAt?: number;
   source: 'voice' | 'manual';
-  updatedAt?: number;
 }
